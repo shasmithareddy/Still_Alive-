@@ -28,8 +28,49 @@ type LocationCallback = (data: LocationData) => void;
 type PeerCallback = (peerId: string) => void;
 type StatusCallback = (status: 'connecting' | 'connected' | 'disconnected' | 'mesh-active') => void;
 
-// ✅ REPLACE THIS WITH YOUR MAC'S LOCAL IP
-const BACKEND_URL = "http://172.16.40.134:3001";
+// Configuration from environment variables or defaults
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
+// PeerJS server configuration
+const getPeerConfig = () => {
+  const peerHost = import.meta.env.VITE_PEER_HOST || undefined;
+  const peerPort = import.meta.env.VITE_PEER_PORT ? Number(import.meta.env.VITE_PEER_PORT) : undefined;
+  const peerPath = import.meta.env.VITE_PEER_PATH || '/peerjs';
+  const peerSecure = import.meta.env.VITE_PEER_SECURE === 'true';
+
+  const config: any = {
+    config: {
+      iceServers: [
+        // STUN servers for NAT traversal
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        // TURN server for relay if direct connection fails
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelay',
+          credential: 'openrelay',
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelay',
+          credential: 'openrelay',
+        },
+      ]
+    }
+  };
+
+  // Only add host/port if explicitly configured
+  if (peerHost) {
+    config.host = peerHost;
+    config.port = peerPort || 443;
+    config.path = peerPath;
+    config.secure = peerSecure;
+  }
+
+  return config;
+};
 
 class CommunicationService {
   private peer: Peer | null = null;
@@ -47,39 +88,43 @@ class CommunicationService {
 
   private messageHistory: ChatMessage[] = [];
   private knownPeers: Set<string> = new Set();
+  private connectionAttempts: Map<string, number> = new Map();
+  private maxRetries = 3;
+  private connectionTimeout = 30000; // 30 seconds
 
   init(username: string): Promise<string> {
     this.username = username;
+    console.log(`🚀 Initializing CommunicationService for user: ${username}`);
+    console.log(`📍 Backend URL: ${BACKEND_URL}`);
 
     // Connect to signaling backend
     this.socket = io(BACKEND_URL);
 
     this.socket.on('connect', () => {
-      console.log('Socket connected:', this.socket?.id);
+      console.log(`✅ Socket.IO connected: ${this.socket?.id}`);
+      this.addSystemMessage(`✅ Connected to signaling server (${this.socket?.id})`);
     });
 
     this.socket.on('disconnect', () => {
-      console.log('Socket disconnected');
+      console.log('❌ Socket.IO disconnected');
+      this.addSystemMessage('❌ Disconnected from signaling server');
     });
 
     return new Promise((resolve, reject) => {
-      this.peer = new Peer({
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-          ]
-        }
-      });
+      const peerConfig = getPeerConfig();
+      console.log('🔧 Peer config:', peerConfig);
+      this.peer = new Peer(undefined, peerConfig);
 
       this.peer.on('open', (id) => {
+        console.log(`✅ Peer initialized with ID: ${id}`);
         this.myPeerId = id;
         this.notifyStatus('connected');
-        this.addSystemMessage(`Node initialized: ${id.slice(0, 8)}...`);
+        this.addSystemMessage(`✅ Node initialized: ${id.slice(0, 8)}...`);
 
         // Auto-join location-based zone via socket
         navigator.geolocation.getCurrentPosition(
           (pos) => {
+            console.log(`📍 Got GPS location: ${pos.coords.latitude}, ${pos.coords.longitude}`);
             this.socket?.emit("join-network", {
               username: this.username,
               lat: pos.coords.latitude,
@@ -88,6 +133,7 @@ class CommunicationService {
             });
           },
           () => {
+            console.log('📍 Using fallback location (Chennai)');
             // Fallback location (Chennai) if GPS denied
             this.socket?.emit("join-network", {
               username: this.username,
@@ -100,9 +146,11 @@ class CommunicationService {
 
         // Auto-connect to peers already in zone
         this.socket?.on("existing-users", (users: { username: string; peerId: string }[]) => {
+          console.log(`🌐 Found ${users.length} existing user(s) in zone`);
           this.addSystemMessage(`Found ${users.length} node(s) in your zone`);
           users.forEach(user => {
             if (user.peerId && user.peerId !== id) {
+              console.log(`  🔗 Auto-connecting to ${user.peerId.slice(0, 8)}...`);
               this.connectToPeer(user.peerId).catch(console.error);
             }
           });
@@ -153,16 +201,21 @@ class CommunicationService {
   }
 
   private handleConnection(conn: DataConnection) {
+    const peerId = conn.peer;
+    console.log(`📍 handleConnection called for ${peerId.slice(0, 8)}...`);
+    
     conn.on('open', () => {
-      this.connections.set(conn.peer, conn);
-      this.knownPeers.add(conn.peer);
-      this.peerConnectedCallbacks.forEach(cb => cb(conn.peer));
-      this.addSystemMessage(`Peer connected: ${conn.peer.slice(0, 8)}...`);
+      console.log(`✅ Data connection OPEN with ${peerId.slice(0, 8)}...`);
+      this.connections.set(peerId, conn);
+      this.knownPeers.add(peerId);
+      this.peerConnectedCallbacks.forEach(cb => cb(peerId));
+      this.addSystemMessage(`✅ Peer connected: ${peerId.slice(0, 8)}...`);
       this.notifyStatus('mesh-active');
     });
 
     conn.on('data', (data: unknown) => {
       const msg = data as { type: string; payload: any };
+      console.log(`📨 Data received from ${peerId.slice(0, 8)}... Type: ${msg.type}`, msg.payload);
       switch (msg.type) {
         case 'chat':
           this.messageCallbacks.forEach(cb => cb(msg.payload));
@@ -179,32 +232,132 @@ class CommunicationService {
     });
 
     conn.on('close', () => {
-      this.connections.delete(conn.peer);
-      this.peerDisconnectedCallbacks.forEach(cb => cb(conn.peer));
-      this.addSystemMessage(`Peer disconnected: ${conn.peer.slice(0, 8)}...`);
+      console.log(`❌ Connection closed with ${peerId.slice(0, 8)}...`);
+      this.connections.delete(peerId);
+      this.peerDisconnectedCallbacks.forEach(cb => cb(peerId));
+      this.addSystemMessage(`❌ Peer disconnected: ${peerId.slice(0, 8)}...`);
       if (this.connections.size === 0) {
         this.notifyStatus('connected');
       }
     });
+
+    conn.on('error', (err) => {
+      console.error(`⚠️ Connection error with ${peerId.slice(0, 8)}...`, err);
+      this.addSystemMessage(`⚠️ Error from ${peerId.slice(0, 8)}...: ${err.message || err}`);
+    });
   }
 
-  connectToPeer(peerId: string): Promise<void> {
+  connectToPeer(peerId: string, retryCount = 0): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (!this.peer) return reject(new Error('Not initialized'));
-      if (this.connections.has(peerId)) return resolve();
+      if (!this.peer) return reject(new Error('Peer not initialized'));
+      if (this.connections.has(peerId)) {
+        console.log(`✓ Already connected to ${peerId.slice(0, 8)}...`);
+        return resolve();
+      }
 
-      const conn = this.peer.connect(peerId, { reliable: true });
-      this.handleConnection(conn);
-      conn.on('open', () => resolve());
-      conn.on('error', (err) => reject(err));
+      if (retryCount === 0) {
+        this.connectionAttempts.set(peerId, 0);
+      }
+
+      console.log(`🔗 Connecting to peer ${peerId.slice(0, 8)}... (attempt ${retryCount + 1}/${this.maxRetries + 1})`);
+      
+      let timeoutHandle: NodeJS.Timeout | null = null;
+      let resolved = false;
+
+      try {
+        const conn = this.peer.connect(peerId, { reliable: true });
+        
+        const onOpen = () => {
+          if (!resolved) {
+            resolved = true;
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            conn.removeListener('error', onError);
+            conn.removeListener('close', onClose);
+            this.handleConnection(conn);
+            console.log(`✅ Connected to peer ${peerId.slice(0, 8)}...`);
+            resolve();
+          }
+        };
+
+        const onError = (err: any) => {
+          if (!resolved) {
+            resolved = true;
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            conn.removeListener('open', onOpen);
+            conn.removeListener('close', onClose);
+            console.error(`❌ Connection error for ${peerId.slice(0, 8)}...`, err.message || err);
+            
+            // Retry if we haven't exceeded max retries
+            if (retryCount < this.maxRetries) {
+              const delayMs = 1000 * Math.pow(2, retryCount); // exponential backoff
+              console.log(`⏳ Retrying in ${delayMs}ms...`);
+              setTimeout(() => {
+                this.connectToPeer(peerId, retryCount + 1).then(resolve).catch(reject);
+              }, delayMs);
+            } else {
+              reject(new Error(`Failed to connect after ${this.maxRetries + 1} attempts: ${err.message || err}`));
+            }
+          }
+        };
+
+        const onClose = () => {
+          if (!resolved) {
+            resolved = true;
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            conn.removeListener('open', onOpen);
+            conn.removeListener('error', onError);
+            console.warn(`⚠️ Connection closed before opening for ${peerId.slice(0, 8)}...`);
+            reject(new Error('Connection closed before opening'));
+          }
+        };
+
+        // Timeout for connection attempt
+        timeoutHandle = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            conn.removeListener('open', onOpen);
+            conn.removeListener('error', onError);
+            conn.removeListener('close', onClose);
+            conn.close();
+            console.warn(`⏱️ Connection timeout for ${peerId.slice(0, 8)}...`);
+            
+            // Retry if we haven't exceeded max retries
+            if (retryCount < this.maxRetries) {
+              const delayMs = 1000 * Math.pow(2, retryCount);
+              console.log(`⏳ Retrying in ${delayMs}ms...`);
+              setTimeout(() => {
+                this.connectToPeer(peerId, retryCount + 1).then(resolve).catch(reject);
+              }, delayMs);
+            } else {
+              reject(new Error(`Connection timeout after ${this.maxRetries + 1} attempts`));
+            }
+          }
+        }, this.connectionTimeout);
+
+        conn.once('open', onOpen);
+        conn.once('error', onError);
+        conn.once('close', onClose);
+      } catch (err) {
+        console.error(`❌ Exception connecting to ${peerId.slice(0, 8)}...`, err);
+        reject(err);
+      }
     });
   }
 
   private broadcast(type: string, payload: any) {
     const data = { type, payload };
+    console.log(`📡 Broadcasting ${type} to ${this.connections.size} peer(s)`, payload);
     this.connections.forEach(conn => {
-      if (conn.open) conn.send(data);
+      if (conn.open) {
+        console.log(`  → Sending to ${conn.peer.slice(0, 8)}...`);
+        conn.send(data);
+      } else {
+        console.warn(`  ⚠️ Connection with ${conn.peer.slice(0, 8)}... not open, skipping`);
+      }
     });
+    if (this.connections.size === 0) {
+      console.warn('⚠️ No peers to broadcast to');
+    }
   }
 
   sendMessage(content: string) {

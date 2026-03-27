@@ -5,6 +5,7 @@ import { communicationService, ChatMessage } from '@/services/communicationServi
 const TerminalChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
+  const [debugMode, setDebugMode] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -19,17 +20,94 @@ const TerminalChat = () => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const addSystemMessage = (content: string) => {
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      sender: 'SYSTEM',
+      content,
+      timestamp: Date.now(),
+      type: 'system',
+    };
+    setMessages(prev => [...prev, msg]);
+  };
+
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    if (input.startsWith('/connect ')) {
-      const peerId = input.split(' ')[1];
-      communicationService.connectToPeer(peerId).catch(console.error);
-    } else if (input === '/sos') {
+    const trimmedInput = input.trim();
+
+    // Help command
+    if (trimmedInput === '/help') {
+      addSystemMessage('📖 Available commands:');
+      addSystemMessage('  /connect <peer-id>   - Connect to a peer');
+      addSystemMessage('  /peers               - List connected peers');
+      addSystemMessage('  /status              - Show connection status');
+      addSystemMessage('  /sos                 - Send SOS signal');
+      addSystemMessage('  /debug               - Toggle debug mode');
+      addSystemMessage('  /clear               - Clear messages');
+      addSystemMessage('  /help                - Show this message');
+    }
+    // Peers list
+    else if (trimmedInput === '/peers') {
+      const peers = communicationService.getConnectedPeers();
+      if (peers.length === 0) {
+        addSystemMessage('❌ No peers connected');
+      } else {
+        addSystemMessage(`📡 Connected peers (${peers.length}):`);
+        peers.forEach((peerId, idx) => {
+          addSystemMessage(`  ${idx + 1}. ${peerId}`);
+        });
+      }
+    }
+    // Status
+    else if (trimmedInput === '/status') {
+      const peerId = communicationService.getPeerId();
+      const peers = communicationService.getConnectedPeers();
+      addSystemMessage(`📊 Status Report:`);
+      addSystemMessage(`  Node ID: ${peerId}`);
+      addSystemMessage(`  Connected Peers: ${peers.length}`);
+      addSystemMessage(`  Messages: ${communicationService.getMessageHistory().length}`);
+      if (debugMode) {
+        addSystemMessage(`  Debug Mode: ON`);
+      }
+    }
+    // Debug toggle
+    else if (trimmedInput === '/debug') {
+      setDebugMode(!debugMode);
+      addSystemMessage(`🐛 Debug mode ${!debugMode ? 'enabled' : 'disabled'}`);
+    }
+    // Clear
+    else if (trimmedInput === '/clear') {
+      setMessages([]);
+    }
+    // Connect to peer
+    else if (trimmedInput.startsWith('/connect ')) {
+      const peerId = trimmedInput.split(' ')[1];
+      if (!peerId) {
+        addSystemMessage('❌ Usage: /connect <peer-id>');
+        setInput('');
+        return;
+      }
+      addSystemMessage(`🔗 Connecting to ${peerId.slice(0, 8)}...`);
+      communicationService.connectToPeer(peerId)
+        .then(() => {
+          addSystemMessage(`✅ Successfully connected to ${peerId.slice(0, 8)}...`);
+        })
+        .catch((err) => {
+          addSystemMessage(`❌ Connection failed: ${err.message}`);
+          if (debugMode) {
+            console.error('Connection error:', err);
+          }
+        });
+    }
+    // SOS
+    else if (trimmedInput === '/sos') {
       communicationService.sendSOS();
-    } else {
-      communicationService.sendMessage(input.trim());
+    }
+    // Regular message
+    else {
+      communicationService.sendMessage(trimmedInput);
     }
     setInput('');
   };
@@ -49,7 +127,7 @@ const TerminalChat = () => {
     <div className="flex flex-col h-full border border-border bg-card rounded-sm" style={{ boxShadow: 'var(--terminal-glow)' }}>
       {/* Header */}
       <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-        <span className="text-xs text-foreground glow-text">MESH://CHAT</span>
+        <span className="text-xs text-foreground glow-text">MESH://CHAT {debugMode && '🐛'}</span>
         <span className="text-xs text-muted-foreground">{messages.length} msgs</span>
       </div>
 
@@ -57,7 +135,7 @@ const TerminalChat = () => {
       <div className="flex-1 overflow-y-auto p-3 space-y-1 text-xs">
         {messages.length === 0 && (
           <div className="text-muted-foreground">
-            {'>'} Waiting for traffic... Type /connect &lt;peer-id&gt; to link nodes
+            {'>'} Type /help for commands. /connect &lt;peer-id&gt; to link nodes
           </div>
         )}
         {messages.map((msg) => (
@@ -83,7 +161,8 @@ const TerminalChat = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           className="flex-1 bg-transparent border-none outline-none text-foreground font-mono text-xs caret-primary"
-          placeholder="message or /connect <peer-id> or /sos"
+          placeholder="Type /help for commands"
+          autoFocus
         />
       </form>
     </div>
