@@ -25,16 +25,19 @@ const BootScreen = ({ onComplete }: BootScreenProps) => {
 
   useEffect(() => {
     let i = 0;
+    let cancelled = false;
     const interval = setInterval(() => {
+      if (cancelled) return;
       if (i < BOOT_LINES.length) {
-        setLines(prev => [...prev, BOOT_LINES[i]]);
+        const line = BOOT_LINES[i];
         i++;
+        setLines(prev => [...prev, line]);
       } else {
         clearInterval(interval);
         setBootDone(true);
       }
     }, 150);
-    return () => clearInterval(interval);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
