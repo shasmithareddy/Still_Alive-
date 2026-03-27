@@ -1,4 +1,5 @@
 import Peer, { DataConnection } from 'peerjs';
+import { io, Socket } from 'socket.io-client';
 
 export interface ChatMessage {
   id: string;
@@ -27,8 +28,12 @@ type LocationCallback = (data: LocationData) => void;
 type PeerCallback = (peerId: string) => void;
 type StatusCallback = (status: 'connecting' | 'connected' | 'disconnected' | 'mesh-active') => void;
 
+// ✅ REPLACE THIS WITH YOUR MAC'S LOCAL IP
+const BACKEND_URL = "http://172.16.40.134:3001";
+
 class CommunicationService {
   private peer: Peer | null = null;
+  private socket: Socket | null = null;
   private connections: Map<string, DataConnection> = new Map();
   private myPeerId: string = '';
   private username: string = '';
@@ -45,6 +50,18 @@ class CommunicationService {
 
   init(username: string): Promise<string> {
     this.username = username;
+
+    // Connect to signaling backend
+    this.socket = io(BACKEND_URL);
+
+    this.socket.on('connect', () => {
+      console.log('Socket connected:', this.socket?.id);
+    });
+
+    this.socket.on('disconnect', () => {
+      console.log('Socket disconnected');
+    });
+
     return new Promise((resolve, reject) => {
       this.peer = new Peer({
         config: {
@@ -59,6 +76,60 @@ class CommunicationService {
         this.myPeerId = id;
         this.notifyStatus('connected');
         this.addSystemMessage(`Node initialized: ${id.slice(0, 8)}...`);
+
+        // Auto-join location-based zone via socket
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            this.socket?.emit("join-network", {
+              username: this.username,
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              peerId: id,
+            });
+          },
+          () => {
+            // Fallback location (Chennai) if GPS denied
+            this.socket?.emit("join-network", {
+              username: this.username,
+              lat: 13.0827,
+              lng: 80.2707,
+              peerId: id,
+            });
+          }
+        );
+
+        // Auto-connect to peers already in zone
+        this.socket?.on("existing-users", (users: { username: string; peerId: string }[]) => {
+          this.addSystemMessage(`Found ${users.length} node(s) in your zone`);
+          users.forEach(user => {
+            if (user.peerId && user.peerId !== id) {
+              this.connectToPeer(user.peerId).catch(console.error);
+            }
+          });
+        });
+
+        // Auto-connect when a new peer joins zone
+        this.socket?.on("user-joined", (user: { username: string; peerId: string }) => {
+          if (user.peerId && user.peerId !== id) {
+            this.addSystemMessage(`New node in zone: ${user.username}`);
+            this.connectToPeer(user.peerId).catch(console.error);
+          }
+        });
+
+        // Handle peer leaving zone
+        this.socket?.on("user-left", ({ peerId }: { peerId: string }) => {
+          if (this.connections.has(peerId)) {
+            this.connections.get(peerId)?.close();
+            this.connections.delete(peerId);
+            this.addSystemMessage(`Node left zone: ${peerId.slice(0, 8)}...`);
+          }
+        });
+
+        // Zone info confirmation
+        this.socket?.on("zone-info", ({ room }: { room: string }) => {
+          this.addSystemMessage(`📡 Joined zone: ${room}`);
+        });
+
         resolve(id);
       });
 
@@ -205,6 +276,8 @@ class CommunicationService {
     this.connections.clear();
     this.peer?.destroy();
     this.peer = null;
+    this.socket?.disconnect();
+    this.socket = null;
   }
 }
 
