@@ -91,11 +91,11 @@ class MultiUserChatServer {
     });
 
     return new Promise((resolve, reject) => {
-      this.server = net.createServer((socket) => {
-        this.handleNewClient(socket);
-      });
+      const createServerWithErrorRetry = () => {
+        this.server = net.createServer((socket) => {
+          this.handleNewClient(socket);
+        });
 
-      const tryListen = () => {
         this.server.listen(this.port, '0.0.0.0', () => {
           const localIP = this.getLocalIP();
           console.log(`\n✅ Chat server listening on ${localIP}:${this.port}`);
@@ -104,24 +104,22 @@ class MultiUserChatServer {
           this.addSystemMessage(`🏠 Room: ${roomId}`);
           resolve(this.myPeerId);
         });
+
+        this.server.on('error', (err) => {
+          if (err.code === 'EADDRINUSE') {
+            console.log(`⚠️  Port ${this.port} in use, trying ${this.port + 1}...`);
+            this.port++;
+            this.server.close(() => {
+              createServerWithErrorRetry();
+            });
+          } else {
+            console.error(`❌ Server error: ${err.message}`);
+            reject(err);
+          }
+        });
       };
 
-      this.server.on('error', (err) => {
-        if (err.code === 'EADDRINUSE') {
-          console.log(`⚠️  Port ${this.port} in use, trying ${this.port + 1}...`);
-          this.port++;
-          this.server.close();
-          this.server = net.createServer((socket) => {
-            this.handleNewClient(socket);
-          });
-          tryListen();
-        } else {
-          console.error(`❌ Server error: ${err.message}`);
-          reject(err);
-        }
-      });
-
-      tryListen();
+      createServerWithErrorRetry();
     });
   }
 
