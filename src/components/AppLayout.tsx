@@ -6,6 +6,7 @@ import MeshMap from './MeshMap';
 import NetworkStatus from './NetworkStatus';
 import MeshTopology from './MeshTopology';
 import DemoButton from './DemoButton';
+import OfflineModeToggle from './OfflineModeToggle';
 
 type Tab = 'chat' | 'map' | 'mesh';
 
@@ -20,20 +21,23 @@ const AppLayout = () => {
           <span className="text-sm font-bold text-foreground glow-text tracking-widest">STILLALIVE</span>
           <span className="text-xs text-muted-foreground">v2.7.1</span>
         </div>
-        <div className="flex gap-1">
-          {(['chat', 'map', 'mesh'] as Tab[]).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1 text-xs font-mono border rounded-sm transition-colors ${
-                activeTab === tab
-                  ? 'border-primary text-foreground bg-secondary'
-                  : 'border-border text-muted-foreground hover:text-foreground hover:border-primary/50'
-              }`}
-            >
-              {tab.toUpperCase()}
-            </button>
-          ))}
+        <div className="flex gap-2 items-center">
+          <OfflineModeToggle />
+          <div className="flex gap-1">
+            {(['chat', 'map', 'mesh'] as Tab[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-1 text-xs font-mono border rounded-sm transition-colors ${
+                  activeTab === tab
+                    ? 'border-primary text-foreground bg-secondary'
+                    : 'border-border text-muted-foreground hover:text-foreground hover:border-primary/50'
+                }`}
+              >
+                {tab.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
