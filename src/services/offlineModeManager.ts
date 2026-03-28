@@ -41,33 +41,9 @@ class OfflineModeManager {
    * Initialize offline mode manager
    */
   async init(communicationService: CommunicationService): Promise<void> {
-    try {
-      this.communicationService = communicationService;
-      
-      // Initialize IndexedDB
-      try {
-        await this.initializeIndexedDB();
-        console.log('✅ IndexedDB initialized');
-      } catch (dbError) {
-        console.warn('⚠️ IndexedDB initialization failed:', dbError);
-        // Continue without local caching
-      }
-      
-      // Load pending messages (non-blocking)
-      try {
-        this.loadPendingMessages();
-      } catch (loadError) {
-        console.warn('⚠️ Failed to load pending messages:', loadError);
-        // Continue anyway
-      }
-      
-      // Start in online mode by default
-      this.currentMode = 'online';
-      console.log('✅ Offline mode manager initialized (Online mode)');
-    } catch (error) {
-      console.error('❌ Offline mode manager init failed:', error);
-      // Still functional, just without offline features
-    }
+    this.communicationService = communicationService;
+    await this.initializeIndexedDB();
+    this.loadPendingMessages();
   }
 
   /**
@@ -171,10 +147,8 @@ class OfflineModeManager {
         await this.meshService.init('Still-Alive-User');
         console.log('✅ Mesh network initialized');
       } catch (error) {
-        console.warn('⚠️ Mesh network unavailable:', error);
-        // Still allow offline mode, just without peer discovery
-        // Messages will be stored locally and synced when online
-        console.log('✅ Offline mode active (local storage only)');
+        console.error('❌ Failed to initialize mesh:', error);
+        throw error;
       }
     }
   }

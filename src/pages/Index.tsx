@@ -11,13 +11,10 @@ const Index = () => {
     try {
       await communicationService.init(username);
       
-      // Initialize offline mode manager in background (non-blocking)
-      // This way the UI loads immediately even if mesh initialization fails
+      // Initialize offline mode manager after communication service is ready
       const offlineManager = getOfflineModeManager();
-      offlineManager.init(communicationService).catch(err => {
-        console.warn('⚠️ Offline mode failed to initialize:', err);
-        // App still works, just without offline features
-      });
+      await offlineManager.init(communicationService);
+      console.log('✅ Offline mode initialized');
       
       setBooted(true);
     } catch (err) {

@@ -49,37 +49,33 @@ class LibP2PMeshService {
       this.username = username;
       console.log(`🚀 [LibP2P Mesh] Initializing: ${username}`);
 
-      // Attempt to create and start the node
-      try {
-        this.node = await createLibp2p({
-          addresses: {
-            listen: ['/ip4/0.0.0.0/tcp/0']
-          },
-          transports: [tcp()],
-          streamMuxers: [mplex()],
-          connectionEncryption: [noise()],
-          services: {
-            identify: identify(),
-            ping: ping(),
-            mdns: mdns({
-              interval: 20e3,
-            }),
-          },
-        });
+      this.node = await createLibp2p({
+        addresses: {
+          listen: ['/ip4/0.0.0.0/tcp/0']
+        },
+        transports: [tcp()],
+        streamMuxers: [mplex()],
+        connectionEncryption: [noise()],
+        services: {
+          identify: identify(),
+          ping: ping(),
+          mdns: mdns({
+            interval: 20e3, // Discover peers every 20 seconds
+          }),
+        },
+        connectionManager: {
+          maxConnections: 100,
+          minConnections: 5,
+        },
+      });
 
-        await this.node.start();
-      } catch (startError) {
-        console.warn('⚠️ [LibP2P Mesh] Failed to start node:', startError);
-        // Continue without mesh - fall back to online-only mode
-        this.isInitialized = false;
-        throw new Error('LibP2P initialization failed - falling back to online mode');
-      }
-
+      await this.node.start();
       this.peerId = this.node.peerId.toString();
       this.isInitialized = true;
 
       console.log(`✅ [LibP2P Mesh] Node started`);
       console.log(`📍 Peer ID: ${this.peerId}`);
+      console.log(`🌐 Addresses: ${this.node.getMultiaddrs().map((m: any) => m.toString()).join(', ')}`);
 
       this.setupEventListeners();
       this.notifyStatus(`Ready (Mesh Mode)`);
@@ -87,7 +83,6 @@ class LibP2PMeshService {
       return this.peerId;
     } catch (error) {
       console.error('❌ [LibP2P Mesh] Initialization failed:', error);
-      this.isInitialized = false;
       this.notifyStatus(`Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw error;
     }
