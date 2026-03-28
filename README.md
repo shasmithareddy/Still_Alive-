@@ -1,3 +1,4 @@
+# 🚀 Still Alive – Decentralized CLI Communication System
 ## 📌 Overview
 
 **Still Alive** is a next-generation CLI-based real-time communication system that simulates **decentralized, peer-to-peer (P2P) networking** across dynamic location zones. Inspired by modern distributed systems, it blends **TCP-based messaging**, **WebSockets**, and concepts from **mDNS (Multicast DNS)** and **WebRTC-style peer discovery** to create a lightweight yet powerful communication layer.
@@ -44,17 +45,6 @@ Perfect for exploring:
 > A next-gen CLI-based real-time communication platform simulating **P2P networking**, **zone-based routing**, and **decentralized connectivity** using WebSockets, TCP, and mDNS-inspired discovery.
 
 ---
-
-## 📌 Overview
-
-**Still Alive** is a lightweight yet powerful real-time communication system that mimics **distributed network behavior**. It enables users to connect via CLI and communicate within dynamically assigned zones, while incorporating concepts from:
-
-- 🔗 Peer-to-Peer (P2P) Networking  
-- 🌐 TCP/IP Communication  
-- 📡 mDNS-based Local Discovery (conceptual)  
-- 🛰️ WebRTC-style Signaling & Connectivity  
-
-With upcoming features like **automatic network detection** and the **Escuar Monitoring Dashboard**, Still Alive evolves beyond a CLI tool into a complete decentralized communication ecosystem.
 
 ---
 
