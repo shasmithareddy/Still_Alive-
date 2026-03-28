@@ -11,4 +11,29 @@ Perfect for exploring:
 - 🔗 **Peer-to-peer (P2P) connectivity models**  
 - 💬 **CLI-driven distributed chat systems**  
 - ⚡ **Low-latency, event-driven message exchange**  
-- 🛰️ **Concepts inspired by WebRTC signaling & mesh networks**  
+- 🛰️ **Concepts inspired by WebRTC signaling & mesh networks**
+
+- ## 🏗️ Tech Stack
+
+### ⚙️ Core Technologies
+- **Node.js** – Backend runtime for handling asynchronous, event-driven communication  
+- **Express.js** – Lightweight server framework for handling HTTP and socket connections  
+
+### 🔌 Real-Time Communication
+- **Socket.IO** – Enables real-time, bidirectional communication over WebSockets  
+- **WebSockets** – Low-latency, persistent connection for instant message exchange  
+
+### 💻 CLI & Runtime
+- **Node.js CLI (process.argv / custom scripts)** – Interactive command-line chat interface  
+- **JavaScript (ES6+)** – Core programming language used across the project  
+
+### 🌐 Networking Concepts Implemented
+- **TCP/IP Model** – Underlying transport for reliable communication  
+- **Zone-based Routing Logic** – Custom algorithm for grouping users by location  
+- **P2P-inspired Architecture** – Simulated peer-to-peer communication within zones  
+- **mDNS-inspired Discovery (Conceptual)** – Localized grouping and discovery mechanism  
+- **WebRTC-inspired Signaling (Conceptual)** – Mimics decentralized connection patterns  
+
+### 🛠️ Development Tools
+- **Git & GitHub** – Version control and collaboration  
+- **NPM** – Dependency management  
