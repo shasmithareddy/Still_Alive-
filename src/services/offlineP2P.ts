@@ -152,7 +152,8 @@ class OfflineP2PService {
               this.connectToPeer(peerId, retryCount + 1).then(resolve).catch(reject);
             }, delay);
           } else {
-            reject(new Error(`Connection failed after ${maxRetries + 1} attempts: ${err.message}`));
+            const msg = err instanceof Error ? err.message : String(err);
+            reject(new Error(`Connection failed after ${maxRetries + 1} attempts: ${msg}`));
           }
         };
 
