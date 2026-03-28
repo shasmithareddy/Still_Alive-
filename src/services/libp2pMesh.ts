@@ -1,11 +1,10 @@
 import { createLibp2p } from 'libp2p';
-import { TCP } from '@libp2p/tcp';
-import { MPLEX } from '@libp2p/mplex';
-import { NOISE } from '@libp2p/noise';
+import { tcp } from '@libp2p/tcp';
+import { mplex } from '@libp2p/mplex';
+import { noise } from '@libp2p/noise';
 import { identify } from '@libp2p/identify';
 import { ping } from '@libp2p/ping';
 import { mdns } from '@libp2p/mdns';
-import { PeerInfo } from '@libp2p/interface';
 
 export interface MeshPeer {
   peerId: string;
@@ -54,9 +53,9 @@ class LibP2PMeshService {
         addresses: {
           listen: ['/ip4/0.0.0.0/tcp/0']
         },
-        transports: [new TCP()],
-        streamMuxers: [new MPLEX()],
-        connectionEncryption: [new NOISE()],
+        transports: [tcp()],
+        streamMuxers: [mplex()],
+        connectionEncryption: [noise()],
         services: {
           identify: identify(),
           ping: ping(),
