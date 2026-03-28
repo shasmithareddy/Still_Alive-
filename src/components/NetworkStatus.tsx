@@ -1,21 +1,56 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { communicationService } from '@/services/communicationService';
+import { communicationService, ZoneMember } from '@/services/communicationService';
 
 const NetworkStatus = () => {
-  const [status, setStatus] = useState<string>('connecting');
-  const [peers, setPeers] = useState<string[]>([]);
+  // ✅ Initialize from service immediately — no waiting for events
+  const [status, setStatus] = useState<string>(() => 'connecting');
+  const [zoneMembers, setZoneMembers] = useState<ZoneMember[]>([]);
   const [peerId, setPeerId] = useState('');
+  const [room, setRoom] = useState('');
 
   useEffect(() => {
+    // Sync static values immediately
     setPeerId(communicationService.getPeerId());
+    setRoom(communicationService.getCurrentRoom());
+
+    // Poll for peerId and room since they're set async after init
+    const poll = setInterval(() => {
+      const id = communicationService.getPeerId();
+      const r = communicationService.getCurrentRoom();
+      if (id) setPeerId(id);
+      if (r) setRoom(r);
+    }, 500);
 
     const unsubs = [
+      // ✅ onStatusChange now fires immediately with current status
       communicationService.onStatusChange(setStatus),
-      communicationService.onPeerConnected(() => setPeers(communicationService.getConnectedPeers())),
-      communicationService.onPeerDisconnected(() => setPeers(communicationService.getConnectedPeers())),
+
+      // ✅ onZoneMembers now fires immediately with current members (includes CLI peers)
+      communicationService.onZoneMembers((members) => {
+        const others = members.filter(m => m.peerId !== communicationService.getPeerId());
+        setZoneMembers(others);
+      }),
+
+      // WebRTC events — refresh zone members
+      communicationService.onPeerConnected(() => {
+        const others = communicationService.getZoneMembers().filter(
+          m => m.peerId !== communicationService.getPeerId()
+        );
+        setZoneMembers(others);
+      }),
+      communicationService.onPeerDisconnected(() => {
+        const others = communicationService.getZoneMembers().filter(
+          m => m.peerId !== communicationService.getPeerId()
+        );
+        setZoneMembers(others);
+      }),
     ];
-    return () => unsubs.forEach(u => u());
+
+    return () => {
+      clearInterval(poll);
+      unsubs.forEach(u => u());
+    };
   }, []);
 
   const statusColor = {
@@ -25,8 +60,15 @@ const NetworkStatus = () => {
     'mesh-active': 'text-foreground glow-text',
   }[status] || 'text-muted-foreground';
 
+  const statusDot = {
+    connecting: 'bg-muted-foreground',
+    connected: 'bg-primary/60',
+    disconnected: 'bg-destructive',
+    'mesh-active': 'bg-primary',
+  }[status] || 'bg-muted-foreground';
+
   const copyPeerId = () => {
-    navigator.clipboard.writeText(peerId);
+    if (peerId) navigator.clipboard.writeText(peerId);
   };
 
   return (
@@ -36,7 +78,7 @@ const NetworkStatus = () => {
         <motion.div
           animate={{ opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 2, repeat: Infinity }}
-          className={`w-2 h-2 rounded-full ${status === 'mesh-active' ? 'bg-primary' : status === 'connected' ? 'bg-primary/60' : 'bg-destructive'}`}
+          className={`w-2 h-2 rounded-full ${statusDot}`}
         />
       </div>
 
@@ -47,7 +89,14 @@ const NetworkStatus = () => {
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">PEERS:</span>
-          <span className="text-foreground">{peers.length}</span>
+          {/* ✅ Shows ALL peers in zone — web + CLI */}
+          <span className="text-foreground">{zoneMembers.length}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">ZONE:</span>
+          <span className="text-foreground text-right truncate max-w-[120px]" title={room}>
+            {room || '—'}
+          </span>
         </div>
         <div className="flex justify-between items-start gap-2">
           <span className="text-muted-foreground shrink-0">NODE ID:</span>
@@ -56,17 +105,24 @@ const NetworkStatus = () => {
             className="text-foreground text-right break-all hover:text-primary transition-colors"
             title="Click to copy"
           >
-            {peerId.slice(0, 16)}...
+            {peerId ? `${peerId.slice(0, 16)}...` : '—'}
           </button>
         </div>
       </div>
 
-      {peers.length > 0 && (
+      {/* ✅ Shows all zone members with their type (WebRTC or CLI) */}
+      {zoneMembers.length > 0 && (
         <div className="space-y-1 pt-2 border-t border-border">
-          <span className="text-xs text-muted-foreground">CONNECTED NODES:</span>
-          {peers.map(p => (
-            <div key={p} className="text-xs text-secondary-foreground flex items-center gap-1">
-              <span className="text-foreground">●</span> {p.slice(0, 12)}...
+          <span className="text-xs text-muted-foreground">ZONE NODES ({zoneMembers.length}):</span>
+          {zoneMembers.map(m => (
+            <div key={m.peerId} className="text-xs text-secondary-foreground flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1">
+                <span className={m.isWebRTC ? 'text-primary' : 'text-yellow-500'}>●</span>
+                <span>{m.username}</span>
+              </div>
+              <span className="text-muted-foreground text-[10px]">
+                {m.isWebRTC ? 'WebRTC' : 'CLI'}
+              </span>
             </div>
           ))}
         </div>

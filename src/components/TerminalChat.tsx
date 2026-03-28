@@ -37,18 +37,17 @@ const TerminalChat = () => {
 
     const trimmedInput = input.trim();
 
-    // Help command
     if (trimmedInput === '/help') {
       addSystemMessage('📖 Available commands:');
       addSystemMessage('  /connect <peer-id>   - Connect to a peer');
       addSystemMessage('  /peers               - List connected peers');
       addSystemMessage('  /status              - Show connection status');
+      addSystemMessage('  /zone                - Show current zone');
       addSystemMessage('  /sos                 - Send SOS signal');
       addSystemMessage('  /debug               - Toggle debug mode');
       addSystemMessage('  /clear               - Clear messages');
       addSystemMessage('  /help                - Show this message');
     }
-    // Peers list
     else if (trimmedInput === '/peers') {
       const peers = communicationService.getConnectedPeers();
       if (peers.length === 0) {
@@ -60,28 +59,28 @@ const TerminalChat = () => {
         });
       }
     }
-    // Status
+    else if (trimmedInput === '/zone') {
+      const room = communicationService.getCurrentRoom();
+      addSystemMessage(`📍 Current zone: ${room || 'not joined yet'}`);
+    }
     else if (trimmedInput === '/status') {
       const peerId = communicationService.getPeerId();
       const peers = communicationService.getConnectedPeers();
+      const room = communicationService.getCurrentRoom();
       addSystemMessage(`📊 Status Report:`);
       addSystemMessage(`  Node ID: ${peerId}`);
-      addSystemMessage(`  Connected Peers: ${peers.length}`);
+      addSystemMessage(`  Zone: ${room || 'none'}`);
+      addSystemMessage(`  WebRTC Peers: ${peers.length}`);
       addSystemMessage(`  Messages: ${communicationService.getMessageHistory().length}`);
-      if (debugMode) {
-        addSystemMessage(`  Debug Mode: ON`);
-      }
+      if (debugMode) addSystemMessage(`  Debug Mode: ON`);
     }
-    // Debug toggle
     else if (trimmedInput === '/debug') {
       setDebugMode(!debugMode);
       addSystemMessage(`🐛 Debug mode ${!debugMode ? 'enabled' : 'disabled'}`);
     }
-    // Clear
     else if (trimmedInput === '/clear') {
       setMessages([]);
     }
-    // Connect to peer
     else if (trimmedInput.startsWith('/connect ')) {
       const peerId = trimmedInput.split(' ')[1];
       if (!peerId) {
@@ -91,24 +90,19 @@ const TerminalChat = () => {
       }
       addSystemMessage(`🔗 Connecting to ${peerId.slice(0, 8)}...`);
       communicationService.connectToPeer(peerId)
-        .then(() => {
-          addSystemMessage(`✅ Successfully connected to ${peerId.slice(0, 8)}...`);
-        })
+        .then(() => addSystemMessage(`✅ Connected to ${peerId.slice(0, 8)}...`))
         .catch((err) => {
           addSystemMessage(`❌ Connection failed: ${err.message}`);
-          if (debugMode) {
-            console.error('Connection error:', err);
-          }
+          if (debugMode) console.error('Connection error:', err);
         });
     }
-    // SOS
     else if (trimmedInput === '/sos') {
       communicationService.sendSOS();
     }
-    // Regular message
     else {
       communicationService.sendMessage(trimmedInput);
     }
+
     setInput('');
   };
 
@@ -120,14 +114,21 @@ const TerminalChat = () => {
   };
 
   const formatTime = (ts: number) => {
-    return new Date(ts).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return new Date(ts).toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
   };
 
   return (
     <div className="flex flex-col h-full border border-border bg-card rounded-sm" style={{ boxShadow: 'var(--terminal-glow)' }}>
       {/* Header */}
       <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-        <span className="text-xs text-foreground glow-text">MESH://CHAT {debugMode && '🐛'}</span>
+        <span className="text-xs text-foreground glow-text">
+          MESH://CHAT {debugMode && '🐛'}
+        </span>
         <span className="text-xs text-muted-foreground">{messages.length} msgs</span>
       </div>
 
@@ -146,7 +147,11 @@ const TerminalChat = () => {
             className={getMessageStyle(msg)}
           >
             <span className="text-muted-foreground">[{formatTime(msg.timestamp)}]</span>{' '}
-            {msg.type !== 'system' && <span className="text-secondary-foreground">{msg.sender}:</span>}{' '}
+            {msg.type !== 'system' && (
+              <span className={msg.sender === communicationService.getUsername() ? 'text-primary' : 'text-secondary-foreground'}>
+                {msg.sender}:
+              </span>
+            )}{' '}
             {msg.content}
           </motion.div>
         ))}
