@@ -44,7 +44,7 @@ const getPeerConfig = () => {
   const peerPath = import.meta.env.VITE_PEER_PATH || '/peerjs';
   const peerSecure = import.meta.env.VITE_PEER_SECURE === 'true';
 
-  const config: any = {
+  const config: Record<string, unknown> = {
     config: {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -344,7 +344,7 @@ class CommunicationService {
     });
 
     conn.on('data', (data: unknown) => {
-      const msg = data as { type: string; payload: any };
+      const msg = data as { type: string; payload: unknown };
       switch (msg.type) {
         case 'chat': {
           const p = msg.payload as ChatMessage;
@@ -356,11 +356,11 @@ class CommunicationService {
           break;
         }
         case 'sos':
-          this.sosCallbacks.forEach(cb => cb(msg.payload));
-          this.addSystemMessage(`🚨 SOS RECEIVED from ${msg.payload.sender}`);
+          this.sosCallbacks.forEach(cb => cb(msg.payload as SOSData));
+          this.addSystemMessage(`🚨 SOS RECEIVED from ${(msg.payload as SOSData).sender}`);
           break;
         case 'location':
-          this.locationCallbacks.forEach(cb => cb(msg.payload));
+          this.locationCallbacks.forEach(cb => cb(msg.payload as LocationData));
           break;
       }
     });
@@ -378,8 +378,9 @@ class CommunicationService {
       if (this.connections.size === 0) this.notifyStatus('connected');
     });
 
-    conn.on('error', (err) => {
-      this.addSystemMessage(`⚠️ Error from ${peerId.slice(0, 8)}...: ${err.message || err}`);
+    conn.on('error', (err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.addSystemMessage(`⚠️ Error from ${peerId.slice(0, 8)}...: ${msg}`);
     });
   }
 
@@ -403,13 +404,14 @@ class CommunicationService {
           }
         };
 
-        const retry = (err: any) => {
+        const retry = (err: unknown) => {
           if (retryCount < this.maxRetries) {
             setTimeout(() => {
               this.connectToPeer(peerId, retryCount + 1).then(resolve).catch(reject);
             }, 1000 * Math.pow(2, retryCount));
           } else {
-            reject(new Error(`Failed after ${this.maxRetries + 1} attempts: ${err?.message || err}`));
+            const errMsg = err instanceof Error ? err.message : String(err);
+            reject(new Error(`Failed after ${this.maxRetries + 1} attempts: ${errMsg}`));
           }
         };
 
@@ -425,9 +427,9 @@ class CommunicationService {
         reject(err);
       }
     });
-  }
+    }
 
-  private broadcast(type: string, payload: any) {
+    private broadcast(type: string, payload: unknown) {
     this.connections.forEach(conn => {
       if (conn.open) conn.send({ type, payload });
     });

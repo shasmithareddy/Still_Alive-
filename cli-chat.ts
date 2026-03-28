@@ -7,6 +7,7 @@
  */
 
 import readline from 'readline';
+import { exec } from 'child_process';
 import { offlineP2P } from './src/services/offlineP2P';
 
 const rl = readline.createInterface({
@@ -88,9 +89,9 @@ async function handleCommand(input: string) {
     const id = offlineP2P.getPeerId();
     // Copy to clipboard (basic implementation)
     if (process.platform === 'win32') {
-      require('child_process').exec(`powershell -Command "Add-Content -Path $env:TEMP\\peer.txt -Value '${id}' -Force; Get-Content $env:TEMP\\peer.txt | Set-Clipboard"`);
+      exec(`powershell -Command "Add-Content -Path $env:TEMP\\peer.txt -Value '${id}' -Force; Get-Content $env:TEMP\\peer.txt | Set-Clipboard"`);
     } else {
-      require('child_process').exec(`echo -n "${id}" | pbcopy || xclip -selection clipboard`);
+      exec(`echo -n "${id}" | pbcopy || xclip -selection clipboard`);
     }
     console.log(`\n✅ Copied to clipboard: ${id.slice(0, 8)}...`);
   } else if (trimmed === '/peers') {
@@ -116,8 +117,12 @@ async function handleCommand(input: string) {
     } else {
       try {
         await offlineP2P.connectToPeer(peerId);
-      } catch (err: any) {
-        console.log(`\n❌ Connection failed: ${err.message}`);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          console.log(`\n❌ Connection failed: ${err.message}`);
+        } else {
+          console.log(`\n❌ Connection failed: ${String(err)}`);
+        }
       }
     }
   } else if (trimmed === '/exit') {
@@ -148,8 +153,12 @@ async function main() {
   try {
     const peerId = await offlineP2P.init(username);
     console.log(`✅ Peer initialized: \x1b[92m${peerId}\x1b[0m`);
-  } catch (err: any) {
-    console.error(`❌ Failed to init: ${err.message}`);
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.error(`❌ Failed to init: ${err.message}`);
+    } else {
+      console.error(`❌ Failed to init: ${String(err)}`);
+    }
     process.exit(1);
   }
 

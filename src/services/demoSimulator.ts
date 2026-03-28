@@ -1,4 +1,4 @@
-import { communicationService } from './communicationService';
+import { communicationService, ChatMessage } from './communicationService';
 
 const FAKE_CALLSIGNS = ['BRAVO-7', 'DELTA-3', 'ECHO-9', 'FOXTROT-1', 'GHOST-4', 'HAWK-2', 'IRON-6', 'JACKAL-8'];
 const FAKE_MESSAGES = [
@@ -196,8 +196,9 @@ class DemoSimulator {
       type: 'system' as const,
     };
     // Access internal callbacks through the service
-    (communicationService as any).messageHistory.push(msg);
-    (communicationService as any).messageCallbacks.forEach((cb: any) => cb(msg));
+    const svc = communicationService as unknown as { messageHistory: ChatMessage[]; messageCallbacks: Array<(m: ChatMessage) => void> };
+    svc.messageHistory.push(msg);
+    svc.messageCallbacks.forEach(cb => cb(msg));
   }
 
   private injectChatMessage(sender: string, content: string) {
@@ -208,8 +209,9 @@ class DemoSimulator {
       timestamp: Date.now(),
       type: 'chat' as const,
     };
-    (communicationService as any).messageHistory.push(msg);
-    (communicationService as any).messageCallbacks.forEach((cb: any) => cb(msg));
+    const svc = communicationService as unknown as { messageHistory: ChatMessage[]; messageCallbacks: Array<(m: ChatMessage) => void> };
+    svc.messageHistory.push(msg);
+    svc.messageCallbacks.forEach(cb => cb(msg));
   }
 }
 

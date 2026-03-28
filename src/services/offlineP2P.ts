@@ -132,15 +132,16 @@ class OfflineP2PService {
           resolve();
         };
 
-        const onError = (err: any) => {
+        const onError = (err: unknown) => {
           if (resolved) return;
           resolved = true;
           clearTimeout(timeout);
           conn.removeListener('open', onOpen);
           conn.removeListener('close', onClose);
 
-          console.error(`❌ Connection error for ${peerId.slice(0, 8)}...`, err.message);
-          this.addSystemMessage(`❌ Connection error: ${err.message}`);
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`❌ Connection error for ${peerId.slice(0, 8)}...`, msg);
+          this.addSystemMessage(`❌ Connection error: ${msg}`);
 
           // Retry with exponential backoff
           if (retryCount < maxRetries) {
@@ -209,7 +210,7 @@ class OfflineP2PService {
       }
     });
 
-    conn.on('data', (data: any) => {
+    conn.on('data', (data: unknown) => {
       const msg = data as P2PMessage;
       console.log(`📨 Message from ${peerId.slice(0, 8)}...`, msg);
       this.messageHistory.push(msg);
@@ -222,9 +223,10 @@ class OfflineP2PService {
       this.addSystemMessage(`❌ Disconnected from ${peerId.slice(0, 8)}...`);
     });
 
-    conn.on('error', (err) => {
-      console.error(`⚠️ Connection error: ${peerId.slice(0, 8)}...`, err);
-      this.addSystemMessage(`⚠️ Error from ${peerId.slice(0, 8)}...: ${err.message}`);
+    conn.on('error', (err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`⚠️ Connection error: ${peerId.slice(0, 8)}...`, msg);
+      this.addSystemMessage(`⚠️ Error from ${peerId.slice(0, 8)}...: ${msg}`);
     });
   }
 
