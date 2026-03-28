@@ -1,0 +1,16 @@
+node_modules
+.git
+.env
+src
+public
+*.md
+playwright*
+vitest*
+tsconfig*
+vite.config.ts
+postcss.config.js
+tailwind.config.ts
+eslint.config.js
+components.json
+package-lock.json
+bun.lock
