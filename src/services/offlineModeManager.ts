@@ -39,11 +39,13 @@ class OfflineModeManager {
 
   /**
    * Initialize offline mode manager
+   * NOTE: Currently disabled due to browser compatibility issues with libp2p/mdns
    */
   async init(communicationService: CommunicationService): Promise<void> {
     this.communicationService = communicationService;
-    await this.initializeIndexedDB();
-    this.loadPendingMessages();
+    this.currentMode = 'online';
+    console.log('ℹ️ Offline mode manager ready (Online mode only)');
+    // TODO: Re-enable mesh networking with proper browser polyfills
   }
 
   /**

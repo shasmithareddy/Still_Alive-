@@ -3,6 +3,8 @@ node_modules
 .env
 src
 public
+dist
+build
 *.md
 playwright*
 vitest*
@@ -14,3 +16,8 @@ eslint.config.js
 components.json
 package-lock.json
 bun.lock
+index.html
+cli-chat.js
+cli-chat.ts
+chat.bat
+

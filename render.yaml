@@ -4,9 +4,8 @@ services:
     env: node
     region: us-east
     plan: free
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: bash build.sh
+    startCommand: node backend/server.js
     healthCheckPath: /
     envVars:
       - key: NODE_ENV
