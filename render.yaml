@@ -4,12 +4,12 @@ services:
     env: node
     region: us-east
     plan: free
-    buildCommand: cd backend && npm install
-    startCommand: cd backend && npm start
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
     healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3000
-      # Note: Render will auto-detect health checks. If using custom domain, update VITE_BACKEND_URL in frontend accordingly
